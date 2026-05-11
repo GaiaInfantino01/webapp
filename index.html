@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Scanner ISBN Biblioteca</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+  <header class="hero">
+    <div class="hero-content">
+      <h1>Scanner ISBN Biblioteca</h1>
+      <p>Scansiona i libri con la fotocamera e genera automaticamente un file Excel.</p>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="card">
+      <h2>Scansiona codice ISBN</h2>
+
+      <div id="reader"></div>
+
+      <div class="buttons">
+        <button id="startBtn">Avvia fotocamera</button>
+        <button id="stopBtn" class="secondary">Ferma fotocamera</button>
+      </div>
+
+      <p id="status">Premi “Avvia fotocamera” per iniziare.</p>
+    </section>
+
+    <section class="card">
+      <h2>Inserimento manuale</h2>
+
+      <div class="manual-grid">
+        <input id="manualIsbn" type="text" placeholder="Inserisci ISBN manualmente" />
+        <button id="manualBtn">Cerca ISBN</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Libri acquisiti</h2>
+
+      <div class="table-wrapper">
+        <table id="booksTable">
+          <thead>
+            <tr>
+              <th>ISBN</th>
+              <th>Titolo</th>
+              <th>Autore</th>
+              <th>Genere</th>
+              <th>Abstract</th>
+              <th>Pagine</th>
+              <th>Lingua</th>
+              <th>Editore</th>
+              <th>Luogo</th>
+              <th>Data</th>
+              <th>Azione</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="buttons">
+        <button id="exportBtn">Esporta Excel</button>
+        <button id="clearBtn" class="danger">Svuota lista</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
