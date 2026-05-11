@@ -78,18 +78,44 @@ function searchManualISBN() {
 }
 
 function cleanISBN(value) {
-  return String(value).replace(/[^0-9Xx]/g, "");
+  let code = String(value || "")
+    .replace(/[^0-9Xx]/g, "")
+    .toUpperCase();
+
+  if (code.length > 13) {
+    const match = code.match(/(978|979)\d{10}/);
+    if (match) code = match[0];
+  }
+
+  return code;
 }
 
 async function fetchBookData(isbn) {
+  isbn = cleanISBN(isbn);
+
+  if (!isbn) {
+    statusText.textContent = "ISBN non valido.";
+    return;
+  }
+
   if (books.some(book => book.ISBN === isbn)) {
     statusText.textContent = "Questo libro è già presente nella lista.";
     return;
   }
 
-  statusText.textContent = "Cerco i dati del libro...";
+  statusText.textContent = `Cerco i dati del libro con ISBN ${isbn}...`;
 
-  let book = await searchGoogleBooks(isbn);
+  let book = null;
+
+  book = await searchGoogleBooks(isbn);
+
+  if (!book) {
+    book = await searchGoogleBooksAlternative(isbn);
+  }
+
+  if (!book) {
+    book = await searchOpenLibraryAdvanced(isbn);
+  }
 
   if (!book) {
     book = await searchOpenLibrary(isbn);
@@ -111,7 +137,7 @@ async function fetchBookData(isbn) {
 
     statusText.textContent = "Libro non trovato online. Puoi completarlo manualmente.";
   } else {
-    statusText.textContent = "Libro aggiunto correttamente.";
+    statusText.textContent = `Libro trovato: ${book.Titolo || "senza titolo"}`;
   }
 
   books.push(book);
@@ -121,7 +147,29 @@ async function fetchBookData(isbn) {
 
 async function searchGoogleBooks(isbn) {
   try {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&maxResults=5`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) return null;
+
+    const item = data.items.find(volume => {
+      const ids = volume.volumeInfo.industryIdentifiers || [];
+      return ids.some(id => cleanISBN(id.identifier) === isbn);
+    }) || data.items[0];
+
+    const info = item.volumeInfo;
+
+    return normalizeBookFromGoogle(info, isbn);
+  } catch (error) {
+    console.error("Errore Google Books:", error);
+    return null;
+  }
+}
+
+async function searchGoogleBooksAlternative(isbn) {
+  try {
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(isbn)}&maxResults=5`;
     const response = await fetch(url);
     const data = await response.json();
 
@@ -129,27 +177,60 @@ async function searchGoogleBooks(isbn) {
 
     const info = data.items[0].volumeInfo;
 
+    return normalizeBookFromGoogle(info, isbn);
+  } catch (error) {
+    console.error("Errore Google Books alternativo:", error);
+    return null;
+  }
+}
+
+function normalizeBookFromGoogle(info, isbn) {
+  return {
+    ISBN: isbn,
+    Titolo: info.title || "",
+    Autore: info.authors ? info.authors.join(", ") : "",
+    Genere: info.categories ? info.categories.join(", ") : "",
+    Abstract: info.description || "",
+    Pagine: info.pageCount || "",
+    Lingua: info.language || "",
+    Editore: info.publisher || "",
+    Luogo: "",
+    Data: info.publishedDate || ""
+  };
+}
+
+async function searchOpenLibraryAdvanced(isbn) {
+  try {
+    const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&jscmd=data&format=json`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const key = `ISBN:${isbn}`;
+    if (!data[key]) return null;
+
+    const info = data[key];
+
     return {
       ISBN: isbn,
       Titolo: info.title || "",
-      Autore: info.authors ? info.authors.join(", ") : "",
-      Genere: info.categories ? info.categories.join(", ") : "",
-      Abstract: info.description || "",
-      Pagine: info.pageCount || "",
-      Lingua: info.language || "",
-      Editore: info.publisher || "",
-      Luogo: "",
-      Data: info.publishedDate || ""
+      Autore: info.authors ? info.authors.map(a => a.name).join(", ") : "",
+      Genere: info.subjects ? info.subjects.map(s => s.name).join(", ") : "",
+      Abstract: info.notes || "",
+      Pagine: info.number_of_pages || "",
+      Lingua: "",
+      Editore: info.publishers ? info.publishers.map(p => p.name).join(", ") : "",
+      Luogo: info.publish_places ? info.publish_places.map(p => p.name).join(", ") : "",
+      Data: info.publish_date || ""
     };
   } catch (error) {
-    console.error("Errore Google Books:", error);
+    console.error("Errore Open Library Advanced:", error);
     return null;
   }
 }
 
 async function searchOpenLibrary(isbn) {
   try {
-    const url = `https://openlibrary.org/isbn/${isbn}.json`;
+    const url = `https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`;
     const response = await fetch(url);
 
     if (!response.ok) return null;
@@ -167,7 +248,9 @@ async function searchOpenLibrary(isbn) {
           : data.description.value
         : "",
       Pagine: data.number_of_pages || "",
-      Lingua: data.languages ? data.languages.map(l => l.key.replace("/languages/", "")).join(", ") : "",
+      Lingua: data.languages
+        ? data.languages.map(l => l.key.replace("/languages/", "")).join(", ")
+        : "",
       Editore: data.publishers ? data.publishers.join(", ") : "",
       Luogo: data.publish_places ? data.publish_places.join(", ") : "",
       Data: data.publish_date || ""
